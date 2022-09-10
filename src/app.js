@@ -5,6 +5,7 @@ import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 import bcrypt from "bcrypt";
 import { v4 as uuid } from "uuid";
+import dayjs from "dayjs";
 dotenv.config();
 
 const app = express();
@@ -85,8 +86,9 @@ app.post("/sign-in", async (req, res) => {
       userId: user._id,
       token,
     });
-
-    return res.send(token).status(200);
+    delete user.password;
+    delete user.confirm_password;
+    return res.send({ user, token }).status(200);
   } catch (error) {
     console.log(error.message);
     res.sendStatus(500);
@@ -100,6 +102,19 @@ app.post("/credit", async (req, res) => {
   if (!token) {
     return res.sendStatus(401);
   }
+
+  const transactionSchema = joi.object({
+    amount: joi.number().precision(2).required(),
+    description: joi.string().required(),
+  });
+
+  const validation = transactionSchema.validate(req.body, { abortEarly: true });
+
+  if (validation.error) {
+    console.log(validation.error.details);
+    return res.sendStatus(401);
+  }
+
   try {
     const session = await db.collection("sessions").findOne({ token });
     if (!session) {
@@ -111,13 +126,15 @@ app.post("/credit", async (req, res) => {
       return res.sendStatus(401);
     }
 
-    const newTransaction = await db.collection("transactions").insertOne({
+    const newTransaction = {
       amount,
       description,
       type: "credit",
-    });
+      date: dayjs().format("DD/MM"),
+    };
+    await db.collection("transactions").insertOne(newTransaction);
 
-    res.send(newTransaction).status(201);
+    res.status(201).send(newTransaction);
   } catch (error) {
     console.log(error.message);
     res.sendStatus(500);
@@ -131,6 +148,21 @@ app.post("/debit", async (req, res) => {
   if (!token) {
     return res.sendStatus(401);
   }
+  const transactionSchema = joi.object({
+    amount: joi.number().precision(2).required(),
+    description: joi.string().required(),
+  });
+
+  const validation = transactionSchema.validate(
+    { amount, description },
+    { abortEarly: true }
+  );
+
+  if (validation.error) {
+    console.log(validation.error.details);
+    return res.sendStatus(401);
+  }
+
   try {
     const session = await db.collection("sessions").findOne({ token });
     if (!session) {
@@ -142,13 +174,15 @@ app.post("/debit", async (req, res) => {
       return res.sendStatus(401);
     }
 
-    const newTransaction = await db.collection("transactions").insertOne({
+    const newTransaction = {
       amount,
       description,
       type: "debit",
-    });
+      date: dayjs().format("DD/MM"),
+    };
+    await db.collection("transactions").insertOne(newTransaction);
 
-    res.send(newTransaction).status(201);
+    res.status(201).send(newTransaction);
   } catch (error) {
     console.log(error.message);
     res.sendStatus(500);
