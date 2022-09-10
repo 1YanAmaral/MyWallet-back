@@ -131,6 +131,7 @@ app.post("/credit", async (req, res) => {
       description,
       type: "credit",
       date: dayjs().format("DD/MM"),
+      userId: user._id,
     };
     await db.collection("transactions").insertOne(newTransaction);
 
@@ -179,6 +180,7 @@ app.post("/debit", async (req, res) => {
       description,
       type: "debit",
       date: dayjs().format("DD/MM"),
+      userId: user._id,
     };
     await db.collection("transactions").insertOne(newTransaction);
 
@@ -200,7 +202,10 @@ app.get("/transactions", async (req, res) => {
       return res.sendStatus(401);
     }
 
-    const transactions = await db.collection("transactions").find().toArray();
+    const transactions = await db
+      .collection("transactions")
+      .find({ userId: session.userId })
+      .toArray();
 
     res.status(200).send(transactions);
   } catch (error) {
